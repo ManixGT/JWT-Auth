@@ -62,6 +62,8 @@ app.post('/logIn', (req, res) => {
     };
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
+    console.log(refreshToken,"refreshToken");
+    
 
     //!Storing Refresh Token into cookies via cookie-parser
     res.cookie('refreshToken', refreshToken, {
@@ -70,7 +72,7 @@ app.post('/logIn', (req, res) => {
         sameSite: 'Strict', //! Prevent CSRF
         maxAge: 3 * 24 * 60 * 60 * 1000 //! 3 days
     });
-    res.json({ accessToken,refreshToken });
+    res.json({ accessToken,refreshToken,message:"Logged In User" });
 });
 
 app.post('/profile', verifyToken, (req, res) => {
@@ -83,6 +85,7 @@ app.post('/profile', verifyToken, (req, res) => {
 
 app.post('/refresh-token', (req, res) => {
     const refreshToken = req.cookies.refreshToken;
+    console.log(req.cookies.refreshToken,"refreshToken")
     if (!refreshToken || !refreshTokensArr.includes(refreshToken)) {
         return res.status(403).json({ msg: "Refresh Token not valid" });
     }

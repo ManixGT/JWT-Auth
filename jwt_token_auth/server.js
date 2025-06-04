@@ -22,7 +22,8 @@ let refreshTokensArr = [];
 
 //! Generate Access Token
 const generateAccessToken = (user) => {
-    return jwt.sign({ user }, secretKey, { expiresIn: '300s' });
+    const accessToken = jwt.sign({ user }, secretKey, { expiresIn: '5m' });
+    return accessToken;
 };
 
 //! Generate Refresh Token
@@ -34,19 +35,21 @@ const generateRefreshToken = (user) => {
 
 //! Verify Token Middleware
 function verifyToken(req, res, next) {
-    //! Extracting token from headers.
-    const bearerHeader = req.cookies.Cookie;
-    if (!bearerHeader || !bearerHeader.startsWith('Bearer ')) {
-        return res.json({ msg: "Invalid authorization header format" });
+    // Use standard Authorization header
+    const bearerHeader = req.headers['authorization'];
+    console.log(bearerHeader, 'authorization header');
+    if (!bearerHeader) {
+        return res.status(401).json({ msg: "Authorization header is missing" });
     }
-    const bearer = bearerHeader.split(" ");
+    const bearer = bearerHeader.split(' ');
     if (bearer.length !== 2 || bearer[0] !== "Bearer") {
         return res.status(401).json({ msg: "Invalid authorization header format" });
     }
     const token = bearer[1];
+    console.log(token, "token");
     req.token = token;
     next();
-}
+};
 
 //! Routes
 app.get('/', (req, res) => {
@@ -62,24 +65,24 @@ app.post('/logIn', (req, res) => {
     };
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
-    console.log(refreshToken,"refreshToken");
-    
 
-    //!Storing Refresh Token into cookies via cookie-parser
+    // No need to set custom header, just return the token in the response
     res.cookie('refreshToken', refreshToken, {
         httpOnly: true, //! JS can't access it
         secure: false,  //! Set to true only if using HTTPS
         sameSite: 'Strict', //! Prevent CSRF
         maxAge: 3 * 24 * 60 * 60 * 1000 //! 3 days
     });
-    res.json({ accessToken,refreshToken,message:"Logged In User" });
+    res.json({ accessToken, refreshToken, message: "Logged In User" });
 });
 
 app.post('/profile', verifyToken, (req, res) => {
-    //! Verifying token
+    console.log(req,"tekknee3");
     jwt.verify(req.token, secretKey, (error, authData) => {
-        if (error) return res.status(401).json({ result: "Invalid Token" });
-        res.json({ message: "Profile accessed", authData });
+        console.log(error,'error');
+        
+        if (error) return res.status(401).json({ result: "Invalid Token",token:req.token });
+        res.json({ message: "Profile accessed",token:req.token, authData });
     });
 });
 
@@ -91,6 +94,8 @@ app.post('/refresh-token', (req, res) => {
     }
 
     jwt.verify(refreshToken, refreshSecretKey, (error, userData) => {
+        console.log(userData.user,"USER");
+        
         if (error) return res.status(403).json({ msg: "Refresh token expired or invalid" });
 
         const newAccessToken = generateAccessToken(userData.user);

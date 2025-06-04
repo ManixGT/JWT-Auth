@@ -1,5 +1,6 @@
 /*
- ! Everytime we use a refreshToken to regenerate a new accessToken.
+ ! [Important]: Everytime we just need to change the global variable value of access token.
+ ? Everytime we use a refreshToken to regenerate a new accessToken.
  ? Our refreshToken also gets regenerated, so we gotta save both new tokens.   
  * By Convention, accessToken to be be stored into Headers and refreshTokens
  * to be stored into cookies via cookie-parser.
@@ -22,7 +23,7 @@ let refreshTokensArr = [];
 
 //! Generate Access Token
 const generateAccessToken = (user) => {
-    const accessToken = jwt.sign({ user }, secretKey, { expiresIn: '5m' });
+    const accessToken = jwt.sign({ user }, secretKey, { expiresIn: '2m' });
     return accessToken;
 };
 
@@ -35,29 +36,21 @@ const generateRefreshToken = (user) => {
 
 //! Verify Token Middleware
 function verifyToken(req, res, next) {
-    // Use standard Authorization header
-    const bearerHeader = req.headers['authorization'];
-    console.log(bearerHeader, 'authorization header');
-    if (!bearerHeader) {
-        return res.status(401).json({ msg: "Authorization header is missing" });
+    //! Using standard Authorization section -> [Type]Bearer Token
+    const bearerHeader = req.headers['authorization'];//!fetching variable from Authorization.
+    const token = bearerHeader?.split(' ')[1];
+
+    if (!bearerHeader || !bearerHeader.startsWith('Bearer ') || !token) {
+        return res.status(401).json({ msg: "Unauthorized: Invalid or missing token" });
     }
-    const bearer = bearerHeader.split(' ');
-    if (bearer.length !== 2 || bearer[0] !== "Bearer") {
-        return res.status(401).json({ msg: "Invalid authorization header format" });
-    }
-    const token = bearer[1];
-    console.log(token, "token");
+
     req.token = token;
     next();
 };
 
 //! Routes
-app.get('/', (req, res) => {
-    res.send('Get api Web token auth');
-});
-
 app.post('/logIn', (req, res) => {
-    //! In real apps, validate user credentials here
+    //! In real apps, validate user need a db connection
     const user = {
         id: 2,
         name: "Mani101",
@@ -66,7 +59,7 @@ app.post('/logIn', (req, res) => {
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
 
-    // No need to set custom header, just return the token in the response
+    //! Using Cookies for refresh-token
     res.cookie('refreshToken', refreshToken, {
         httpOnly: true, //! JS can't access it
         secure: false,  //! Set to true only if using HTTPS
@@ -76,11 +69,8 @@ app.post('/logIn', (req, res) => {
     res.json({ accessToken, refreshToken, message: "Logged In User" });
 });
 
-app.post('/profile', verifyToken, (req, res) => {
-    console.log(req,"tekknee3");
-    jwt.verify(req.token, secretKey, (error, authData) => {
-        console.log(error,'error');
-        
+app.post('/profile', verifyToken, (req, res) => {    
+    jwt.verify(req.token, secretKey, (error, authData) => {                
         if (error) return res.status(401).json({ result: "Invalid Token",token:req.token });
         res.json({ message: "Profile accessed",token:req.token, authData });
     });
@@ -88,14 +78,10 @@ app.post('/profile', verifyToken, (req, res) => {
 
 app.post('/refresh-token', (req, res) => {
     const refreshToken = req.cookies.refreshToken;
-    console.log(req.cookies.refreshToken,"refreshToken")
-    if (!refreshToken || !refreshTokensArr.includes(refreshToken)) {
-        return res.status(403).json({ msg: "Refresh Token not valid" });
-    }
+    
+    if (!refreshToken) return res.status(403).json({ msg: "Refresh Token not valid" });
 
-    jwt.verify(refreshToken, refreshSecretKey, (error, userData) => {
-        console.log(userData.user,"USER");
-        
+    jwt.verify(refreshToken, refreshSecretKey, (error, userData) => {        
         if (error) return res.status(403).json({ msg: "Refresh token expired or invalid" });
 
         const newAccessToken = generateAccessToken(userData.user);
